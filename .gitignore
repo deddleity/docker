@@ -17,3 +17,4 @@ cbmx_landing_pages/update.php
 cbmx_landing_pages/vendor
 cbmx_landing_pages/web.config
 cbmx_landing_pages
+docker-compose.yml

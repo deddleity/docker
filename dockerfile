@@ -1,14 +1,9 @@
+#!/usr/bin/env bash
 FROM debian:jessie
 
 MAINTAINER Clickbus México "it@clickbus.com.mx"
 
 # Settings
-
-ENV SMTP_HOST smtp.gmail.com
-ENV SMTP_PORT 587
-ENV SMTP_FROMNAME My Name
-ENV SMTP_USERNAME username@example.com
-ENV SMTP_PASSWORD secret
 ENV DEBIAN_FRONTEND noninteractive
 ENV NGINX_VERSION 1.12.2-1~jessie
 ENV TERM=linux
@@ -28,14 +23,6 @@ RUN dpkg-reconfigure locales && \
 
 # Prevent restarts when installing
 RUN echo '#!/bin/sh\nexit 101' > /usr/sbin/policy-rc.d && /bin/chmod +x /usr/sbin/policy-rc.d
-
-## Basic Dockerfile settings.
-
-WORKDIR /var/www
-ADD ./cbmx_landing_pages /var/www
-EXPOSE 80
-VOLUME ["/var/www", "/opt/ci"]
-ENV NAME Dev
 
 ## MySQL Client.
 
@@ -58,11 +45,6 @@ RUN echo "deb http://packages.dotdeb.org jessie all" > /etc/apt/sources.list.d/d
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/* ~/.composer
-
-# Setup PHP 7.0 FPM
-ADD ./config/php-fpm/php-fpm.conf /etc/php/7.0/fpm/php-fpm.conf
-ADD ./config/php-fpm/php-fpm.www.conf /etc/php/7.0/fpm/pool.d/www.conf
-ADD ./config/php-fpm/php.ini /etc/php/7.0/fpm/php.ini
 
 # Create socket
 RUN mkdir -p /run/php \
@@ -126,9 +108,17 @@ RUN mkdir -p /var/www \
     && usermod -a -G users root \
     && /bin/chown -R www-data:www-data /var/www
 
+## SASS compass
+
+RUN gem update --system \
+    && gem install compass sass \
+    && sass -v
+
+
+
 # VirtualHost
-ADD ./config/nginx/nginx.conf /etc/nginx/nginx.conf
-ADD ./config/nginx/nginx.default.conf /etc/nginx/conf.d/default.conf
+COPY ./config/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./config/nginx/nginx.default.conf /etc/nginx/conf.d/default.conf
 
 ## Supervisor
 
@@ -137,43 +127,33 @@ RUN pip install supervisor \
     && mkdir -p /var/log/supervisor \
     && mkdir -p /var/run/supervisord
 
+
+# VirtualHost
+COPY ./config/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./config/nginx/nginx.default.conf /etc/nginx/conf.d/default.conf
 # Add supervisord conf
-ADD ./config/supervisor/supervisord.conf /etc/supervisord.conf
+COPY ./config/supervisor/supervisord.conf /etc/supervisord.conf
+# Setup PHP 7.0 FPM
+COPY ./config/php-fpm/php-fpm.conf /etc/php/7.0/fpm/php-fpm.conf
+COPY ./config/php-fpm/php-fpm.www.conf /etc/php/7.0/fpm/pool.d/www.conf
+COPY ./config/php-fpm/php.ini /etc/php/7.0/fpm/php.ini
 
-################################################################################
-## MSMTP
-################################################################################
-
-RUN apt-get update \
-	&& apt-get install --no-install-recommends --no-install-suggests -y msmtp msmtp-mta \
-	&& rm -rf /var/lib/apt/lists/*
-
-ADD ./config/msmtp/mail.sh /opt/mail.sh
-RUN chmod +x /opt/mail.sh \
-    && touch /etc/msmtprc \
-    && chgrp mail /etc/msmtprc \
-    && chmod 644 /etc/msmtprc \
-    && touch /var/log/supervisor/msmtp.log \
-    && chgrp mail /var/log/supervisor/msmtp.log \
-    && chmod 660 /var/log/supervisor/msmtp.log \
-    && rm /usr/sbin/sendmail \
-    && rm /usr/lib/sendmail \
-    && ln -s /usr/bin/msmtp /usr/sbin/sendmail \
-    && ln -s /usr/bin/msmtp /usr/bin/sendmail \
-    && ln -s /usr/bin/msmtp /usr/lib/sendmail
-
-################################################################################
-## SASS compass
-################################################################################
-
-RUN gem update --system \
-    && gem install compass sass \
-    && sass -v
-
-################################################################################
+VOLUME /var-www
+VOLUME /opt/ci
 ## Entrypoint: execution shell on run container
-################################################################################
-
-ADD ./config/entrypoint.sh /entrypoint.sh
+COPY ./config/entrypoint.sh /entrypoint.sh
 RUN /bin/chmod 775 /entrypoint.sh
+
 CMD ["/usr/local/bin/supervisord", "-n"]
+
+COPY ./cbmx_landing_pages /var/www
+VOLUME ./cbmx_landing_pages /var/www
+WORKDIR /var/www
+
+RUN /var/www/composer install
+
+EXPOSE 80
+
+
+
+

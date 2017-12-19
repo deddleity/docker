@@ -31,11 +31,6 @@ echo "ff02::2 ip6-allrouters" >> /etc/hosts
 
 service_index=$(curl -s http://rancher-metadata/2015-12-19/self/container/service_index)
 
-# Run deploy script on the first service instance only (useful for running
-# database commands on a cloud environment).
-if [ "$service_index" == "1" ]; then
-  /opt/ci/_run_once.sh
-fi
-
-# Run deploy script on every service instance.
 /opt/ci/_run.sh
+
+excec $@
